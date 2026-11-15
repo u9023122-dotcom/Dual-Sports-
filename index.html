@@ -97,7 +97,9 @@ h2{font-family:var(--display);font-weight:700;font-size:13px;letter-spacing:.16e
 .seg label{position:relative;text-align:center;padding:9px 4px;border-radius:7px;font-family:var(--display);font-weight:700;font-size:18px;letter-spacing:.08em;cursor:pointer;color:var(--mute)}
 .seg label:has(input:checked){background:var(--chalk);color:var(--night)}
 .go{align-self:flex-start;padding:13px 34px 12px;border-radius:12px;background:var(--flare);color:var(--night);font-family:var(--display);font-style:italic;font-weight:800;font-size:28px;letter-spacing:.04em;box-shadow:0 5px 0 #b38f1a}
-.tapplay{position:absolute;left:max(28px,env(safe-area-inset-left));bottom:max(30px,env(safe-area-inset-bottom));font-size:26px;padding:10px 38px 9px;border-radius:12px;box-shadow:0 5px 0 #b38f1a,0 10px 24px rgba(0,0,0,.45);animation:breathe 1.8s ease-in-out infinite}
+.tbtns{position:absolute;left:max(28px,env(safe-area-inset-left));bottom:max(26px,env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:flex-start;gap:14px}
+.tmulti{font-size:17px;padding:9px 18px;background:rgba(21,28,54,.88);border:1.5px solid rgba(244,241,232,.35)}
+.tapplay{font-size:26px;padding:10px 38px 9px;border-radius:12px;box-shadow:0 5px 0 #b38f1a,0 10px 24px rgba(0,0,0,.45);animation:breathe 1.8s ease-in-out infinite}
 /* title: the staged 3D shot fills the screen; only a left-hand shade so the logo reads and the players stay clear */
 #title{position:absolute;inset:0;background:linear-gradient(90deg,rgba(11,16,32,.85) 0%,rgba(11,16,32,.45) 34%,rgba(11,16,32,0) 58%),linear-gradient(0deg,rgba(11,16,32,.75) 0%,rgba(11,16,32,0) 30%)}
 .tlogo{position:absolute;left:max(28px,env(safe-area-inset-left));top:max(22px,env(safe-area-inset-top));display:flex;flex-direction:column;gap:8px}
@@ -163,7 +165,7 @@ h2{font-family:var(--display);font-weight:700;font-size:13px;letter-spacing:.16e
     <h1 class="logo"><span>DUAL</span><em>SPORTS</em></h1>
     <p class="tline">HOOP <i></i> VS <i></i> GOAL</p>
   </div>
-  <button class="go tapplay" id="tap">PLAY</button>
+  <div class="tbtns"><button class="go tapplay" id="tap">PLAY</button><button class="ghost tmulti" id="multi">MULTIPLAYER</button></div>
   <span class="tver">1V1 · FIRST TO 5</span>
 </div>
 
@@ -190,14 +192,18 @@ h2{font-family:var(--display);font-weight:700;font-size:13px;letter-spacing:.16e
         <label><input type="radio" name="diff" id="dH" value="hard">HARD</label>
       </div>
     </div>
-    <div class="row"><button class="go" type="submit" id="play">PLAY</button><button class="ghost" type="button" id="openSet">SETTINGS</button><button class="ghost" type="button" id="openOnline">ONLINE</button></div>
+    <div class="row"><button class="go" type="submit" id="play">PLAY</button><button class="ghost" type="button" id="openSet">SETTINGS</button></div>
   </form>
 </div>
 
 <div id="online" class="screen hidden">
   <div class="panel">
     <div class="head"><h1><span>PLAY</span> <em>ONLINE</em></h1><button type="button" class="ghost" id="olBack">BACK</button></div>
-    <div class="grp" id="olChoose"><div class="row"><button class="go" type="button" id="olHost">HOST</button><button class="go" type="button" id="olJoin">JOIN</button></div></div>
+    <div class="grp" id="olChoose"><h2>Host plays as</h2>
+      <div class="cards">
+        <label class="card" style="--tc:var(--hoops)"><input type="radio" name="owho" value="B" checked><span class="tag">HOOP</span><strong>Basketballer</strong></label>
+        <label class="card" style="--tc:var(--boots)"><input type="radio" name="owho" value="F"><span class="tag">GOAL</span><strong>Footballer</strong></label>
+      </div><div class="row"><button class="go" type="button" id="olHost">HOST</button><button class="go" type="button" id="olJoin">JOIN</button></div></div>
     <div class="grp hidden" id="olHostBox"><h2>Your friend enters</h2><div class="code" id="olCode">·····</div><div class="final" id="olStatus"></div></div>
     <div class="grp hidden" id="olJoinBox"><div class="code" id="olEntry">·····</div><div class="pad" id="olPad"></div><div class="final" id="olJStatus"></div></div>
   </div>
@@ -877,23 +883,63 @@ const arena=buildArena();
 
 /* ---------- characters: stylised low-poly figures with jointed limbs, animated procedurally ---------- */
 function limb(len,r,mat){const g=new THREE.CylinderGeometry(r,r*0.82,len,8);g.translate(0,-len/2,0);return new THREE.Mesh(g,mat);}
+function cyl(rt,rb,len,y,mat,parent,z){const m=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,len,10),mat);m.position.set(0,y,z||0);parent.add(m);return m;}
+const hexCss=n=>'#'+n.toString(16).padStart(6,'0');
+// shirt front / back, painted: basketball vest with scooped neck and piping, football shirt with stripes and a collar
+function kitTex(id,num,back){const k=KIT[id],main=hexCss(k.main),trim=hexCss(k.trim),skin=hexCss(k.skin);
+  return ctex(128,128,(g,W,H)=>{g.fillStyle=main;g.fillRect(0,0,W,H);
+    if(id==='F'){g.fillStyle='rgba(0,0,0,.2)';for(let x=10;x<W;x+=36)g.fillRect(x,0,18,H);}
+    else{g.fillStyle=trim;g.fillRect(0,0,7,H);g.fillRect(W-7,0,7,H);g.fillStyle='rgba(0,0,0,.25)';g.fillRect(7,0,4,H);g.fillRect(W-11,0,4,H);}
+    if(id==='B'){g.fillStyle=trim;g.beginPath();g.ellipse(W/2,0,back?24:28,back?14:26,0,0,Math.PI);g.fill();g.fillStyle=skin;g.beginPath();g.ellipse(W/2,0,back?19:23,back?9:21,0,0,Math.PI);g.fill();}
+    else{g.fillStyle=trim;g.beginPath();if(back){g.rect(W/2-24,0,48,8);}else{g.moveTo(W/2-26,0);g.lineTo(W/2,26);g.lineTo(W/2+26,0);}g.fill();
+      if(!back){g.fillStyle=skin;g.beginPath();g.moveTo(W/2-15,0);g.lineTo(W/2,15);g.lineTo(W/2+15,0);g.fill();}}
+    g.fillStyle=trim;g.textAlign='center';g.textBaseline='middle';g.font='bold '+(back?70:44)+'px "Arial Narrow",Arial,sans-serif';
+    g.lineWidth=5;g.strokeStyle='rgba(0,0,0,.45)';g.strokeText(num,W/2,back?76:80);g.fillText(num,W/2,back?76:80);});}
 function makeChar(id){
-  const k=KIT[id],skin=lam(k.skin),main=lam(k.main),trim=lam(k.trim),shoe=lam(id==='B'?0xf4f1e8:0x1a1a22),hair=lam(k.hair);
+  const isB=id==='B',k=KIT[id],skin=lam(k.skin),main=lam(k.main),trim=lam(k.trim),hair=lam(k.hair),white=lam(0xf4f1e8),dark=lam(0x17171d);
+  const num=isB?'8':'10',front=lam(0xffffff,{map:kitTex(id,num,false)}),backM=lam(0xffffff,{map:kitTex(id,num,true)});
   const root=new THREE.Group(),hips=new THREE.Group(),spine=new THREE.Group();
   hips.position.y=0.84;root.add(hips);hips.add(spine);
-  box(0.5,0.26,0.3,0,0.02,0,id==='B'?main:trim,hips);
-  box(0.56,0.58,0.3,0,0.44,0,main,spine);box(0.58,0.08,0.31,0,0.2,0,trim,spine);
+  // shorts: long and loose for basketball, short for football; side stripes on both
+  const shortsM=isB?main:trim,stripeM=isB?trim:main;
+  box(0.5,0.26,0.3,0,0.02,0,shortsM,hips);box(0.02,0.26,0.1,0.255,0.02,0,stripeM,hips);box(0.02,0.26,0.1,-0.255,0.02,0,stripeM,hips);
+  // shirt
+  const torso=new THREE.Mesh(new THREE.BoxGeometry(0.56,0.58,0.3),[main,main,isB?skin:main,main,front,backM]);torso.position.set(0,0.44,0);spine.add(torso);
+  box(0.58,0.07,0.31,0,0.2,0,isB?trim:shortsM,spine);
+  cyl(0.085,0.095,0.1,0.76,skin,spine);
   const head=new THREE.Group();head.position.y=0.92;spine.add(head);
   const skull=new THREE.Mesh(new THREE.SphereGeometry(0.2,14,10),skin);head.add(skull);
-  const cap=new THREE.Mesh(new THREE.SphereGeometry(0.212,14,8,0,6.2832,0,1.25),hair);cap.rotation.x=-0.25;head.add(cap);
+  const cap=new THREE.Mesh(new THREE.SphereGeometry(0.212,14,8,0,6.2832,0,isB?1.05:1.3),hair);cap.rotation.x=-0.25;head.add(cap);
+  if(!isB)box(0.26,0.07,0.12,0,0.19,0.1,hair,head);
   box(0.06,0.05,0.04,-0.075,0.02,0.19,bas(0x15151c),head);box(0.06,0.05,0.04,0.075,0.02,0.19,bas(0x15151c),head);
-  if(id==='B'){const band=new THREE.Mesh(new THREE.TorusGeometry(0.2,0.028,6,18),trim);band.rotation.x=Math.PI/2;band.position.y=0.07;head.add(band);}
-  const arm=sx=>{const s=new THREE.Group();s.position.set(sx*0.36,0.66,0);spine.add(s);s.add(limb(0.3,0.08,id==='B'?skin:main));
-    const e=new THREE.Group();e.position.y=-0.3;s.add(e);e.add(limb(0.28,0.065,skin));const h=new THREE.Mesh(new THREE.SphereGeometry(0.085,8,6),skin);h.position.y=-0.31;e.add(h);return{s,e};};
-  const leg=sx=>{const s=new THREE.Group();s.position.set(sx*0.15,-0.04,0);hips.add(s);s.add(limb(0.4,0.105,id==='B'?main:skin));
-    const kn=new THREE.Group();kn.position.y=-0.4;s.add(kn);kn.add(limb(0.38,0.08,id==='B'?skin:trim));box(0.14,0.1,0.3,0,-0.4,0.07,shoe,kn);return{s,k:kn};};
+  if(isB){const band=new THREE.Mesh(new THREE.TorusGeometry(0.2,0.028,6,18),trim);band.rotation.x=Math.PI/2;band.position.y=0.07;head.add(band);}
+  const arm=sx=>{const s=new THREE.Group();s.position.set(sx*0.36,0.66,0);spine.add(s);
+    const sh=new THREE.Mesh(new THREE.SphereGeometry(0.098,8,6),isB?skin:main);s.add(sh);
+    s.add(limb(0.3,0.08,skin));
+    if(isB)cyl(0.1,0.1,0.03,0.0,trim,s).position.x=-sx*0.05;                      // vest armhole piping
+    else{cyl(0.098,0.094,0.19,-0.09,main,s);cyl(0.097,0.097,0.03,-0.185,trim,s);} // short sleeve with a cuff
+    const e=new THREE.Group();e.position.y=-0.3;s.add(e);e.add(limb(0.28,0.065,skin));const h=new THREE.Mesh(new THREE.SphereGeometry(0.085,8,6),skin);h.position.y=-0.31;e.add(h);
+    if(isB)cyl(0.064,0.062,0.06,-0.2,sx>0?trim:white,e);                          // wristbands
+    return{s,e};};
+  const shoeB=kn=>{   // high-top basketball sneaker
+    box(0.16,0.045,0.34,0,-0.432,0.07,white,kn);box(0.162,0.016,0.342,0,-0.447,0.07,trim,kn);
+    box(0.145,0.085,0.3,0,-0.37,0.065,white,kn);box(0.148,0.06,0.09,0,-0.383,0.185,main,kn);
+    cyl(0.088,0.092,0.13,-0.3,main,kn);box(0.08,0.11,0.04,0,-0.3,0.085,white,kn);
+    box(0.15,0.028,0.15,0,-0.365,0.03,trim,kn);box(0.05,0.05,0.02,0,-0.26,-0.09,trim,kn);};
+  const bootF=kn=>{   // low-cut studded football boot
+    const lime=lam(0xc6ff3a);
+    box(0.14,0.025,0.32,0,-0.425,0.07,dark,kn);box(0.135,0.075,0.29,0,-0.385,0.06,lime,kn);box(0.115,0.055,0.07,0,-0.395,0.235,lime,kn);
+    box(0.137,0.06,0.07,0,-0.38,-0.06,dark,kn);box(0.06,0.02,0.15,0,-0.345,0.1,dark,kn);cyl(0.078,0.078,0.035,-0.335,dark,kn);
+    for(const sx of [-1,1])for(const z of [-0.05,0.07,0.19])box(0.028,0.03,0.028,sx*0.045,-0.45,z,white,kn);};
+  const leg=sx=>{const s=new THREE.Group();s.position.set(sx*0.15,-0.04,0);hips.add(s);s.add(limb(0.4,0.098,skin));
+    if(isB){cyl(0.135,0.148,0.35,-0.165,main,s);cyl(0.15,0.15,0.035,-0.335,trim,s);box(0.02,0.33,0.07,sx*0.14,-0.165,0,trim,s);}
+    else{cyl(0.128,0.134,0.2,-0.09,trim,s);cyl(0.136,0.136,0.025,-0.185,main,s);}
+    const kn=new THREE.Group();kn.position.y=-0.4;s.add(kn);
+    if(isB){kn.add(limb(0.38,0.08,skin));cyl(0.079,0.072,0.13,-0.275,white,kn);cyl(0.08,0.08,0.02,-0.225,main,kn);shoeB(kn);}
+    else{kn.add(limb(0.38,0.086,main));cyl(0.093,0.091,0.06,-0.04,trim,kn);cyl(0.092,0.09,0.02,-0.1,trim,kn);box(0.1,0.2,0.05,0,-0.2,0.055,main,kn);bootF(kn);}
+    return{s,k:kn};};
   const o={id,root,hips,spine,head,aL:arm(1),aR:arm(-1),lL:leg(1),lR:leg(-1),phase:0,cur:null,baseY:0.84};
-  root.scale.setScalar(id==='B'?1.13:1.02);
+  root.scale.setScalar(isB?1.13:1.02);
   scene.add(root);
   return o;
 }
@@ -1045,7 +1091,7 @@ const Snd={ctx:null,on:true,master:null,buf:{},bed:null,bedG:null,exc:0,want:fal
 
 /* ---------- match state, input ---------- */
 let match=Sim.create({human:null,tiers:{B:'medium',F:'medium'}});   // attract mode: two bots play behind the menu
-let online=null,human=null,tier='medium',paused=false,camYaw=0,refYaw=0,time=0,acc=0,last=0,pctTick=0;
+let online=null,lastOnline=false,human=null,tier='medium',paused=false,camYaw=0,refYaw=0,time=0,acc=0,last=0,pctTick=0;
 const input={jx:0,jy:0,shoot:false,tackle:false,keys:{}};
 const simIn={mx:0,mz:0,shoot:false,tackle:false,run:false};
 const hud=$('hud'),stick=$('stick'),knob=$('knob'),toastEl=$('toast');
@@ -1225,7 +1271,7 @@ function startMatch(){Snd.pause(false);
   launch(side,Sim.create({human:side,tiers:{B:tier,F:tier}}));
 }
 function launch(side,m){
-  human=side;match=m;const bot=human==='B'?'F':'B';
+  human=side;match=m;lastOnline=!!online;const bot=human==='B'?'F':'B';
   $('online').classList.add('hidden');$('restart').classList.toggle('hidden',!!online);$('pSet').classList.toggle('hidden',!!online);$('again').textContent='REMATCH';
   $('menu').classList.add('hidden');$('over').classList.add('hidden');$('paused').classList.add('hidden');hud.classList.remove('hidden');paused=false;
   $('meName').textContent=online?'YOU':KIT[human].name;$('botName').textContent=online?'FRIEND':KIT[bot].name;
@@ -1236,14 +1282,17 @@ function launch(side,m){
   Snd.init();if(Snd.ctx&&Snd.ctx.state==='suspended'){try{Snd.ctx.resume();}catch(e){}}Snd.crowdStart();
   toast(human==='B'?'TO THE HOOP':'TO THE GOAL',null,KIT[human].css);
 }
-function toMenu(){if(online){netSend({k:'bye'});endOnline();}Snd.crowdStop();Snd.pause(false);human=null;match=Sim.create({human:null,tiers:{B:'medium',F:'medium'}});shownMode=match.ball.mode;morph=1;
-  hud.classList.add('hidden');$('over').classList.add('hidden');$('paused').classList.add('hidden');$('menu').classList.remove('hidden');paused=false;}
+function toMenu(){const wasOl=lastOnline;lastOnline=false;if(online){netSend({k:'bye'});endOnline();}Snd.crowdStop();Snd.pause(false);human=null;match=Sim.create({human:null,tiers:{B:'medium',F:'medium'}});shownMode=match.ball.mode;morph=1;
+  hud.classList.add('hidden');$('over').classList.add('hidden');$('paused').classList.add('hidden');$('menu').classList.remove('hidden');paused=false;if(wasOl){$('menu').classList.add('hidden');olShow('choose');$('online').classList.remove('hidden');}}
 function setPaused(p){if(!human||match.phase==='over')return;if(online){$('paused').classList.toggle('hidden',!p);return;}paused=p;$('paused').classList.toggle('hidden',!p);last=0;Snd.pause(p);}
 function showOver(m){const won=m.winner===human,bot=human==='B'?'F':'B';$('overT').textContent=won?'YOU WIN':online?'YOU LOSE':'BOT WINS';$('overT').style.color=KIT[m.winner].css;
   $('overS').textContent=m.score[human]+' : '+m.score[bot];setTimeout(()=>{if(match===m)$('over').classList.remove('hidden');},1400);}
-$('tap').addEventListener('click',()=>{Snd.init();if(Snd.ctx&&Snd.ctx.state==='suspended'){try{Snd.ctx.resume();}catch(e){}}Snd.bounce(7,'basket','wood');
-  $('title').classList.add('hidden');$('menu').classList.remove('hidden');titleOn=false;camera.fov=58;camera.updateProjectionMatrix();chars.B.cur=chars.F.cur=null;shownMode=match.ball.mode;morph=1;updCamera(match,0,true);});
-$('back').addEventListener('click',()=>{$('menu').classList.add('hidden');$('title').classList.remove('hidden');titleOn=true;camera.fov=46;camera.updateProjectionMatrix();chars.B.cur=chars.F.cur=null;});
+function leaveTitle(){Snd.init();if(Snd.ctx&&Snd.ctx.state==='suspended'){try{Snd.ctx.resume();}catch(e){}}Snd.bounce(7,'basket','wood');
+  $('title').classList.add('hidden');titleOn=false;camera.fov=58;camera.updateProjectionMatrix();chars.B.cur=chars.F.cur=null;shownMode=match.ball.mode;morph=1;updCamera(match,0,true);}
+function toTitle(){$('menu').classList.add('hidden');$('online').classList.add('hidden');$('title').classList.remove('hidden');titleOn=true;camera.fov=46;camera.updateProjectionMatrix();chars.B.cur=chars.F.cur=null;}
+$('tap').addEventListener('click',()=>{leaveTitle();$('menu').classList.remove('hidden');});
+$('multi').addEventListener('click',()=>{leaveTitle();olOpen();});
+$('back').addEventListener('click',toTitle);
 $('setup').addEventListener('submit',e=>{e.preventDefault();startMatch();});
 $('again').addEventListener('click',()=>{if(online)rematchPress();else startMatch();});$('restart').addEventListener('click',startMatch);
 $('toMenu').addEventListener('click',toMenu);$('quit').addEventListener('click',toMenu);
@@ -1274,13 +1323,12 @@ function endOnline(){const o=online;online=null;if(!o)return;o.dead=true;try{o.c
 function olShow(which){$('olChoose').classList.toggle('hidden',which!=='choose');$('olHostBox').classList.toggle('hidden',which!=='host');$('olJoinBox').classList.toggle('hidden',which!=='join');}
 function olOpen(){endOnline();olShow('choose');$('menu').classList.add('hidden');$('online').classList.remove('hidden');}
 function olFail(t){const inGame=!!human;endOnline();netMsg(t);if(inGame)toMenu();else olShow('choose');}
-$('openOnline').addEventListener('click',olOpen);
-$('olBack').addEventListener('click',()=>{endOnline();$('online').classList.add('hidden');$('menu').classList.remove('hidden');});
+$('olBack').addEventListener('click',()=>{endOnline();toTitle();});
 
 $('olHost').addEventListener('click',async()=>{
   olShow('host');$('olCode').textContent='·····';$('olStatus').textContent='CONNECTING…';
   try{await loadPeer();}catch(_){olFail('NO INTERNET');return;}
-  const side=(document.querySelector('input[name=who]:checked')||{value:'B'}).value;let tries=0;
+  const side=(document.querySelector('input[name=owho]:checked')||{value:'B'}).value;let tries=0;
   const open=()=>{
     const code=String(10000+Math.floor(Math.random()*90000));
     const peer=new Peer('dualsports-'+code,{config:ICE,debug:0});
