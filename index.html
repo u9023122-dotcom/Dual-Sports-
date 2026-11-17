@@ -882,71 +882,120 @@ function buildArena(){
 const arena=buildArena();
 
 /* ---------- characters: stylised low-poly figures with jointed limbs, animated procedurally ---------- */
-function limb(len,r,mat){const g=new THREE.CylinderGeometry(r,r*0.82,len,8);g.translate(0,-len/2,0);return new THREE.Mesh(g,mat);}
+/* Bodies are built to real athlete proportions, 1 unit = 1 metre:
+   basketballer 2.01 m (long legs, long arms, lean), footballer 1.80 m (compact, heavier legs). Head is about 1/8 of height. */
+const BODY={
+  B:{thigh:0.50,shin:0.455,T:0.66,neck:0.08,head:1.0,sw:0.252,hw:0.114,ua:0.36,fa:0.30,chest:1.15,legR:1.3,armR:1.3,shoe:1.08},
+  F:{thigh:0.44,shin:0.405,T:0.585,neck:0.07,head:0.94,sw:0.24,hw:0.112,ua:0.31,fa:0.265,chest:1.14,legR:1.45,armR:1.28,shoe:0.98}};
+const ANKLE=0.075;
 function cyl(rt,rb,len,y,mat,parent,z){const m=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,len,10),mat);m.position.set(0,y,z||0);parent.add(m);return m;}
+function ball3(r,x,y,z,mat,parent,sx,sy,sz){const m=new THREE.Mesh(new THREE.SphereGeometry(r,12,9),mat);m.position.set(x,y,z);if(sx)m.scale.set(sx,sy,sz);parent.add(m);return m;}
+// a rounded, tapering body part: radius follows the control points [[t,r],...] from y0 (t=0) to y1 (t=1), closed at both ends
+function shape(ctrl,y0,y1,mat,parent,n,sz){
+  n=n||8;const lo=Math.min(y0,y1),hi=Math.max(y0,y1),flip=y0>y1,pts=[];
+  const rad=t=>{for(let i=1;i<ctrl.length;i++)if(t<=ctrl[i][0]){const a=ctrl[i-1],b=ctrl[i],k=(t-a[0])/((b[0]-a[0])||1);const e=k*k*(3-2*k);return a[1]+(b[1]-a[1])*e;}return ctrl[ctrl.length-1][1];};
+  pts.push(new THREE.Vector2(0,lo));
+  for(let k=0;k<=n;k++){const u=k/n;pts.push(new THREE.Vector2(Math.max(0.001,rad(flip?1-u:u)),lo+(hi-lo)*u));}
+  pts.push(new THREE.Vector2(0,hi));
+  const m=new THREE.Mesh(new THREE.LatheGeometry(pts,14,Math.PI,Math.PI*2),mat);if(sz)m.scale.z=sz;parent.add(m);return m;}
 const hexCss=n=>'#'+n.toString(16).padStart(6,'0');
-// shirt front / back, painted: basketball vest with scooped neck and piping, football shirt with stripes and a collar
-function kitTex(id,num,back){const k=KIT[id],main=hexCss(k.main),trim=hexCss(k.trim),skin=hexCss(k.skin);
-  return ctex(128,128,(g,W,H)=>{g.fillStyle=main;g.fillRect(0,0,W,H);
-    if(id==='F'){g.fillStyle='rgba(0,0,0,.2)';for(let x=10;x<W;x+=36)g.fillRect(x,0,18,H);}
-    else{g.fillStyle=trim;g.fillRect(0,0,7,H);g.fillRect(W-7,0,7,H);g.fillStyle='rgba(0,0,0,.25)';g.fillRect(7,0,4,H);g.fillRect(W-11,0,4,H);}
-    if(id==='B'){g.fillStyle=trim;g.beginPath();g.ellipse(W/2,0,back?24:28,back?14:26,0,0,Math.PI);g.fill();g.fillStyle=skin;g.beginPath();g.ellipse(W/2,0,back?19:23,back?9:21,0,0,Math.PI);g.fill();}
-    else{g.fillStyle=trim;g.beginPath();if(back){g.rect(W/2-24,0,48,8);}else{g.moveTo(W/2-26,0);g.lineTo(W/2,26);g.lineTo(W/2+26,0);}g.fill();
-      if(!back){g.fillStyle=skin;g.beginPath();g.moveTo(W/2-15,0);g.lineTo(W/2,15);g.lineTo(W/2+15,0);g.fill();}}
-    g.fillStyle=trim;g.textAlign='center';g.textBaseline='middle';g.font='bold '+(back?70:44)+'px "Arial Narrow",Arial,sans-serif';
-    g.lineWidth=5;g.strokeStyle='rgba(0,0,0,.45)';g.strokeText(num,W/2,back?76:80);g.fillText(num,W/2,back?76:80);});}
+// the shirt, wrapped once round the body: front in the middle, back on the seam, the sides at the quarter marks
+function kitTex(id,num){const k=KIT[id],main=hexCss(k.main),trim=hexCss(k.trim),skin=hexCss(k.skin);
+  return ctex(256,128,(g,W,H)=>{g.fillStyle=main;g.fillRect(0,0,W,H);
+    const ell=(x,y,rx,ry,col)=>{g.fillStyle=col;g.beginPath();g.ellipse(x,y,rx,ry,0,0,6.2832);g.fill();};
+    if(id==='F'){g.fillStyle='rgba(0,0,0,.2)';for(let x=0;x<W;x+=32)g.fillRect(x+8,0,16,H);
+      g.fillStyle=trim;g.fillRect(0,0,W,13);g.beginPath();g.moveTo(W/2-20,12);g.lineTo(W/2,34);g.lineTo(W/2+20,12);g.fill();
+      g.fillStyle=skin;g.fillRect(0,0,W,6);g.beginPath();g.moveTo(W/2-11,6);g.lineTo(W/2,22);g.lineTo(W/2+11,6);g.fill();}
+    else{g.fillStyle=trim;g.fillRect(60,0,8,H);g.fillRect(188,0,8,H);
+      for(const x of [64,192]){ell(x,12,23,29,trim);ell(x,10,19,25,skin);}          // armholes
+      ell(W/2,8,24,27,trim);ell(W/2,6,20,23,skin);                                  // scooped neck, front
+      for(const x of [0,W]){ell(x,8,21,17,trim);ell(x,6,17,13,skin);}               // and back
+      g.fillStyle=skin;g.fillRect(0,0,W,7);}
+    g.fillStyle=trim;g.textAlign='center';g.textBaseline='middle';g.lineWidth=4;g.strokeStyle='rgba(0,0,0,.45)';
+    const txt=(x,y,px)=>{g.font='bold '+px+'px "Arial Narrow",Arial,sans-serif';g.strokeText(num,x,y);g.fillText(num,x,y);};
+    txt(W/2,62,30);txt(0,62,42);txt(W,62,42);});}
 function makeChar(id){
-  const isB=id==='B',k=KIT[id],skin=lam(k.skin),main=lam(k.main),trim=lam(k.trim),hair=lam(k.hair),white=lam(0xf4f1e8),dark=lam(0x17171d);
-  const num=isB?'8':'10',front=lam(0xffffff,{map:kitTex(id,num,false)}),backM=lam(0xffffff,{map:kitTex(id,num,true)});
+  const isB=id==='B',k=KIT[id],D=BODY[id],skin=lam(k.skin),main=lam(k.main),trim=lam(k.trim),hair=lam(k.hair),white=lam(0xf4f1e8),dark=lam(0x17171d);
+  const shirt=lam(0xffffff,{map:kitTex(id,isB?'8':'10')});
   const root=new THREE.Group(),hips=new THREE.Group(),spine=new THREE.Group();
-  hips.position.y=0.84;root.add(hips);hips.add(spine);
-  // shorts: long and loose for basketball, short for football; side stripes on both
+  const hipY=D.thigh+D.shin+ANKLE,T=D.T,c=D.chest,lr=D.legR,ar=D.armR;
+  hips.position.y=hipY;root.add(hips);hips.add(spine);
+  // pelvis in shorts
   const shortsM=isB?main:trim,stripeM=isB?trim:main;
-  box(0.5,0.26,0.3,0,0.02,0,shortsM,hips);box(0.02,0.26,0.1,0.255,0.02,0,stripeM,hips);box(0.02,0.26,0.1,-0.255,0.02,0,stripeM,hips);
-  // shirt
-  const torso=new THREE.Mesh(new THREE.BoxGeometry(0.56,0.58,0.3),[main,main,isB?skin:main,main,front,backM]);torso.position.set(0,0.44,0);spine.add(torso);
-  box(0.58,0.07,0.31,0,0.2,0,isB?trim:shortsM,spine);
-  cyl(0.085,0.095,0.1,0.76,skin,spine);
-  const head=new THREE.Group();head.position.y=0.92;spine.add(head);
-  const skull=new THREE.Mesh(new THREE.SphereGeometry(0.2,14,10),skin);head.add(skull);
-  const cap=new THREE.Mesh(new THREE.SphereGeometry(0.212,14,8,0,6.2832,0,isB?1.05:1.3),hair);cap.rotation.x=-0.25;head.add(cap);
-  if(!isB)box(0.26,0.07,0.12,0,0.19,0.1,hair,head);
-  box(0.06,0.05,0.04,-0.075,0.02,0.19,bas(0x15151c),head);box(0.06,0.05,0.04,0.075,0.02,0.19,bas(0x15151c),head);
-  if(isB){const band=new THREE.Mesh(new THREE.TorusGeometry(0.2,0.028,6,18),trim);band.rotation.x=Math.PI/2;band.position.y=0.07;head.add(band);}
-  const arm=sx=>{const s=new THREE.Group();s.position.set(sx*0.36,0.66,0);spine.add(s);
-    const sh=new THREE.Mesh(new THREE.SphereGeometry(0.098,8,6),isB?skin:main);s.add(sh);
-    s.add(limb(0.3,0.08,skin));
-    if(isB)cyl(0.1,0.1,0.03,0.0,trim,s).position.x=-sx*0.05;                      // vest armhole piping
-    else{cyl(0.098,0.094,0.19,-0.09,main,s);cyl(0.097,0.097,0.03,-0.185,trim,s);} // short sleeve with a cuff
-    const e=new THREE.Group();e.position.y=-0.3;s.add(e);e.add(limb(0.28,0.065,skin));const h=new THREE.Mesh(new THREE.SphereGeometry(0.085,8,6),skin);h.position.y=-0.31;e.add(h);
-    if(isB)cyl(0.064,0.062,0.06,-0.2,sx>0?trim:white,e);                          // wristbands
-    return{s,e};};
-  const shoeB=kn=>{   // high-top basketball sneaker
-    box(0.16,0.045,0.34,0,-0.432,0.07,white,kn);box(0.162,0.016,0.342,0,-0.447,0.07,trim,kn);
-    box(0.145,0.085,0.3,0,-0.37,0.065,white,kn);box(0.148,0.06,0.09,0,-0.383,0.185,main,kn);
-    cyl(0.088,0.092,0.13,-0.3,main,kn);box(0.08,0.11,0.04,0,-0.3,0.085,white,kn);
-    box(0.15,0.028,0.15,0,-0.365,0.03,trim,kn);box(0.05,0.05,0.02,0,-0.26,-0.09,trim,kn);};
-  const bootF=kn=>{   // low-cut studded football boot
+  shape([[0,0.13*c],[0.3,0.2*c],[0.8,0.196*c],[1,0.17*c]],-0.19,0.08,shortsM,hips,6,0.76);
+  // torso: waist, rib cage, chest and the slope up to the neck
+  shape([[0,0.152*c],[0.12,0.15*c],[0.45,0.178*c],[0.7,0.205*c],[0.84,0.208*c],[0.93,0.16*c],[1,0.07]],0.02,T,shirt,spine,10,0.7);
+  box(0.26*c,0.07,0.15,0,T*0.94,-0.015,isB?skin:main,spine).rotation.x=0.1;   // trapezius
+  cyl(0.154*c,0.156*c,0.035,0.045,isB?trim:shortsM,spine).scale.z=0.76;                 // waistband
+  cyl(isB?0.066:0.064,isB?0.078:0.076,D.neck+0.04,T+D.neck/2-0.01,skin,spine);
+  // head: skull, jaw, ears, nose, brow, hair
+  const head=new THREE.Group();head.position.y=T+D.neck;spine.add(head);
+  const hd=new THREE.Group();hd.scale.setScalar(D.head);head.add(hd);
+  ball3(0.105,0,0.135,0,skin,hd,0.9,1.1,1.0);ball3(0.082,0,0.062,0.018,skin,hd,0.9,0.85,0.98);
+  ball3(0.022,0.094,0.125,0,skin,hd,0.5,1,0.8);ball3(0.022,-0.094,0.125,0,skin,hd,0.5,1,0.8);
+  box(0.024,0.04,0.03,0,0.108,0.104,skin,hd);box(0.05,0.008,0.01,0,0.058,0.094,lam(0x7a3b36),hd);
+  const eyeM=bas(0x15151c);box(0.024,0.014,0.012,-0.037,0.14,0.094,eyeM,hd);box(0.024,0.014,0.012,0.037,0.14,0.094,eyeM,hd);
+  box(0.034,0.008,0.012,-0.037,0.158,0.096,hair,hd);box(0.034,0.008,0.012,0.037,0.158,0.096,hair,hd);
+  const cap=new THREE.Mesh(new THREE.SphereGeometry(0.109,14,8,0,6.2832,0,isB?1.12:1.36),hair);cap.scale.set(0.9,1.1,1.0);cap.position.y=0.137;cap.rotation.x=-0.3;hd.add(cap);
+  if(isB){const band=new THREE.Mesh(new THREE.TorusGeometry(0.097,0.012,6,18),trim);band.rotation.x=Math.PI/2-0.1;band.position.y=0.178;band.scale.set(0.93,1.02,1);hd.add(band);}
+  else{box(0.15,0.035,0.07,0,0.232,0.05,hair,hd);box(0.02,0.07,0.1,0.09,0.17,-0.01,hair,hd);box(0.02,0.07,0.1,-0.09,0.17,-0.01,hair,hd);}
+  // arms: shoulder, upper arm, elbow, forearm, hand
+  const arm=sx=>{const sg=new THREE.Group();sg.position.set(sx*D.sw,T*0.9,0);spine.add(sg);
+    ball3(0.066*ar,0,-0.005,0,isB?skin:main,sg);
+    shape([[0,0.052*ar],[0.3,0.054*ar],[0.75,0.044*ar],[1,0.04*ar]],0,-D.ua,skin,sg,6);
+    if(!isB){shape([[0,0.062*ar],[1,0.058*ar]],0.01,-D.ua*0.55,main,sg,3);cyl(0.06*ar,0.06*ar,0.022,-D.ua*0.55,trim,sg);}
+    const e=new THREE.Group();e.position.y=-D.ua;sg.add(e);ball3(0.041*ar,0,0,0,skin,e);
+    shape([[0,0.04*ar],[0.25,0.043*ar],[0.8,0.031*ar],[1,0.028*ar]],0,-D.fa,skin,e,6);
+    if(isB)cyl(0.034,0.032,0.05,-D.fa+0.045,sx>0?trim:white,e);                        // wristbands
+    box(0.04,0.1,0.095,0,-D.fa-0.045,0.005,skin,e);box(0.034,0.09,0.088,0,-D.fa-0.13,0.008,skin,e);box(0.03,0.065,0.03,0,-D.fa-0.05,0.062,skin,e);
+    return{s:sg,e};};
+  const shoeB=g=>{   // high-top basketball sneaker
+    box(0.16,0.045,0.34,0,-0.052,0.07,white,g);box(0.162,0.016,0.342,0,-0.067,0.07,trim,g);
+    box(0.145,0.085,0.3,0,0.01,0.065,white,g);box(0.148,0.06,0.09,0,-0.003,0.185,main,g);
+    cyl(0.085,0.092,0.14,0.08,main,g);box(0.08,0.12,0.04,0,0.08,0.085,white,g);
+    box(0.15,0.028,0.15,0,0.015,0.03,trim,g);box(0.05,0.05,0.02,0,0.12,-0.09,trim,g);};
+  const bootF=g=>{   // low-cut studded football boot
     const lime=lam(0xc6ff3a);
-    box(0.14,0.025,0.32,0,-0.425,0.07,dark,kn);box(0.135,0.075,0.29,0,-0.385,0.06,lime,kn);box(0.115,0.055,0.07,0,-0.395,0.235,lime,kn);
-    box(0.137,0.06,0.07,0,-0.38,-0.06,dark,kn);box(0.06,0.02,0.15,0,-0.345,0.1,dark,kn);cyl(0.078,0.078,0.035,-0.335,dark,kn);
-    for(const sx of [-1,1])for(const z of [-0.05,0.07,0.19])box(0.028,0.03,0.028,sx*0.045,-0.45,z,white,kn);};
-  const leg=sx=>{const s=new THREE.Group();s.position.set(sx*0.15,-0.04,0);hips.add(s);s.add(limb(0.4,0.098,skin));
-    if(isB){cyl(0.135,0.148,0.35,-0.165,main,s);cyl(0.15,0.15,0.035,-0.335,trim,s);box(0.02,0.33,0.07,sx*0.14,-0.165,0,trim,s);}
-    else{cyl(0.128,0.134,0.2,-0.09,trim,s);cyl(0.136,0.136,0.025,-0.185,main,s);}
-    const kn=new THREE.Group();kn.position.y=-0.4;s.add(kn);
-    if(isB){kn.add(limb(0.38,0.08,skin));cyl(0.079,0.072,0.13,-0.275,white,kn);cyl(0.08,0.08,0.02,-0.225,main,kn);shoeB(kn);}
-    else{kn.add(limb(0.38,0.086,main));cyl(0.093,0.091,0.06,-0.04,trim,kn);cyl(0.092,0.09,0.02,-0.1,trim,kn);box(0.1,0.2,0.05,0,-0.2,0.055,main,kn);bootF(kn);}
-    return{s,k:kn};};
-  const o={id,root,hips,spine,head,aL:arm(1),aR:arm(-1),lL:leg(1),lR:leg(-1),phase:0,cur:null,baseY:0.84};
-  root.scale.setScalar(isB?1.13:1.02);
+    box(0.14,0.025,0.32,0,-0.045,0.07,dark,g);box(0.135,0.075,0.29,0,-0.005,0.06,lime,g);box(0.115,0.055,0.07,0,-0.015,0.235,lime,g);
+    box(0.137,0.06,0.07,0,0,-0.06,dark,g);box(0.06,0.02,0.15,0,0.035,0.1,dark,g);cyl(0.078,0.078,0.035,0.045,dark,g);
+    for(const sx of [-1,1])for(const z of [-0.05,0.07,0.19])box(0.028,0.03,0.028,sx*0.045,-0.07,z,white,g);};
+  const leg=sx=>{const sg=new THREE.Group();sg.position.set(sx*D.hw,0,0);hips.add(sg);
+    shape([[0,0.088*lr],[0.25,0.092*lr],[0.8,0.062*lr],[1,0.056*lr]],0.04,-D.thigh,skin,sg,7);
+    if(isB){shape([[0,0.112*lr+0.012],[1,0.118*lr+0.014]],0.03,-D.thigh*0.72,main,sg,3);cyl(0.12*lr+0.014,0.12*lr+0.014,0.03,-D.thigh*0.72,trim,sg);box(0.016,D.thigh*0.7,0.07,sx*(0.118*lr+0.012),-D.thigh*0.36,0,trim,sg);}
+    else{shape([[0,0.096*lr+0.01],[1,0.098*lr+0.01]],0.03,-D.thigh*0.42,trim,sg,3);cyl(0.1*lr+0.01,0.1*lr+0.01,0.022,-D.thigh*0.42,main,sg);}
+    const kn=new THREE.Group();kn.position.y=-D.thigh;sg.add(kn);ball3(0.058*lr,0,0,0.004,skin,kn);
+    const calf=[[0,0.054*lr],[0.28,0.062*lr],[0.75,0.042*lr],[1,0.038*lr]];
+    if(isB){shape(calf,0,-D.shin,skin,kn,7).position.z=-0.008;shape([[0,0.04*lr+0.006],[1,0.037*lr+0.006]],-D.shin+0.17,-D.shin+0.02,white,kn,3);cyl(0.042*lr+0.006,0.042*lr+0.006,0.018,-D.shin+0.16,main,kn);}
+    else{shape(calf.map(q=>[q[0],q[1]+0.006]),0.0,-D.shin,main,kn,7).position.z=-0.008;cyl(0.064*lr,0.062*lr,0.05,-0.075,trim,kn);box(0.085,D.shin*0.5,0.03,0,-D.shin*0.52,0.04,main,kn);}
+    const sh=new THREE.Group();sh.position.y=-D.shin;sh.scale.set(0.8*D.shoe,1,D.shoe);kn.add(sh);(isB?shoeB:bootF)(sh);
+    return{s:sg,k:kn};};
+  const o={id,root,hips,spine,head,aL:arm(1),aR:arm(-1),lL:leg(1),lR:leg(-1),phase:0,cur:null,baseY:hipY,L1:D.ua,L2:D.fa+0.12,ikw:0};
   scene.add(root);
   return o;
+}
+// two-bone reach: swing the shoulder and bend the elbow so the hand lands on a point in the world (w blends it with the posed arm)
+const ikV=new THREE.Vector3(),ikQ=new THREE.Quaternion(),ikQ2=new THREE.Quaternion(),ikDown=new THREE.Vector3(0,-1,0),ikX=new THREE.Vector3(1,0,0);
+function reach(ch,arm,tx,ty,tz,w){
+  ikV.set(tx,ty,tz);ch.spine.worldToLocal(ikV);ikV.sub(arm.s.position);
+  const L1=ch.L1,L2=ch.L2,d=Math.min(L1+L2-0.004,Math.max(Math.abs(L1-L2)+0.03,ikV.length()));
+  const al=Math.acos(Math.min(1,Math.max(-1,(L1*L1+d*d-L2*L2)/(2*L1*d)))),ga=Math.acos(Math.min(1,Math.max(-1,(L1*L1+L2*L2-d*d)/(2*L1*L2))));
+  ikV.normalize();ikQ.setFromUnitVectors(ikDown,ikV);ikQ2.setFromAxisAngle(ikX,al);ikQ.multiply(ikQ2);
+  arm.s.quaternion.slerp(ikQ,w);arm.e.rotation.x+=(-(Math.PI-ga)-arm.e.rotation.x)*w;
+}
+// the basketballer's hands stay on the ball: the right hand rides it down and meets it on the way up when dribbling, both hands lift it into the shot
+function handsOnBall(m,ch,p,dt){
+  const b=m.ball,a=p.action,on=b.owner==='B'&&b.y!=null&&!(a&&(a.type==='fumble'||a.type==='stumble'));
+  ch.ikw+=((on?1:0)-ch.ikw)*(1-Math.exp(-dt*(on?20:12)));
+  if(ch.ikw<0.02||b.x==null)return;
+  ch.root.updateMatrixWorld(true);
+  const fx=Math.sin(p.face),fz=Math.cos(p.face),lx=fz,lz=-fx,R=Sim.C.BR*BALL_VIS;
+  if(a&&a.type==='shoot'){reach(ch,ch.aR,b.x-fx*R*0.6-lx*R*0.45,b.y-BALL_DROP-R*0.5,b.z-fz*R*0.6-lz*R*0.45,ch.ikw);reach(ch,ch.aL,b.x+lx*R*0.95,b.y-BALL_DROP,b.z+lz*R*0.95,ch.ikw);}
+  else reach(ch,ch.aR,b.x,Math.max(b.y-BALL_DROP+R*0.9,0.82),b.z,ch.ikw);
 }
 const blobTex=ctex(64,64,(g)=>{const r=g.createRadialGradient(32,32,2,32,32,30);r.addColorStop(0,'rgba(0,0,0,.55)');r.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=r;g.fillRect(0,0,64,64);});
 function blob(size){const m=new THREE.Mesh(new THREE.PlaneGeometry(size,size),new THREE.MeshBasicMaterial({map:blobTex,transparent:true,depthWrite:false}));m.rotation.x=-Math.PI/2;m.position.y=0.03;scene.add(m);return m;}
 const chars={B:makeChar('B'),F:makeChar('F')};
-chars.B.shadow=blob(1.9);chars.F.shadow=blob(1.7);
+chars.B.shadow=blob(1.5);chars.F.shadow=blob(1.4);
 const meRing=new THREE.Mesh(new THREE.RingGeometry(0.62,0.78,28),bas(0xffd23f,{transparent:true,opacity:0.9,depthWrite:false}));meRing.rotation.x=-Math.PI/2;meRing.position.y=0.04;scene.add(meRing);
 const laneGeo=new THREE.PlaneGeometry(1,1);laneGeo.rotateX(-Math.PI/2);
 const lane=new THREE.Mesh(laneGeo,bas(0xff5466,{transparent:true,opacity:0.38,depthWrite:false}));lane.visible=false;scene.add(lane);
@@ -1001,6 +1050,7 @@ function syncChar(m,ch,p,dt,time){
   ch.hips.position.y=ch.baseY+q.by;ch.spine.rotation.set(q.lean,q.tw,q.roll);ch.head.rotation.x=q.head;
   ch.aL.s.rotation.set(q.aLx,0,q.aLz);ch.aL.e.rotation.x=q.eL;ch.aR.s.rotation.set(q.aRx,0,-q.aRz);ch.aR.e.rotation.x=q.eR;
   ch.lL.s.rotation.x=q.lLh;ch.lL.k.rotation.x=q.lLk;ch.lR.s.rotation.x=q.lRh;ch.lR.k.rotation.x=q.lRk;
+  if(p.id==='B')handsOnBall(m,ch,p,dt);
   ch.shadow.position.set(p.x,0.03,p.z);const ssz=1/(1+p.jump*0.5);ch.shadow.scale.set(ssz,ssz,1);
 }
 
@@ -1021,8 +1071,10 @@ const ballShadow=blob(1.0);
 const flash=new THREE.Mesh(new THREE.RingGeometry(0.5,0.62,28),bas(0xffffff,{transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide}));scene.add(flash);
 let shownMode='basket',morph=1;
 const axis=new THREE.Vector3();
+// the ball is drawn a little smaller than its physics size so it sits right next to life-size players; it still rests on the ground
+const BALL_VIS=0.72,BALL_DROP=Sim.C.BR*(1-BALL_VIS);
 function syncBall(m,dt){
-  const b=m.ball;ballG.position.set(b.x,b.y,b.z);
+  const b=m.ball;ballG.position.set(b.x,b.y-BALL_DROP,b.z);ballG.scale.setScalar(BALL_VIS);
   const sp=Math.hypot(b.vx,b.vz);
   if(sp>0.2){axis.set(b.vz/sp,0,-b.vx/sp);ballG.rotateOnWorldAxis(axis,sp*dt/C.BR*(b.owner==='B'?0.4:1));}
   morph=Math.min(1,morph+dt/0.26);
@@ -1213,17 +1265,19 @@ let titleOn=true,titleMorph=0,titleDust=0;
 const tLights=[new THREE.PointLight(0x8a6bff,0,16,1.6),new THREE.PointLight(0xff5466,0,16,1.6),new THREE.PointLight(0xfff2d6,0,12,1.6)];
 tLights[0].position.set(-2.5,2.6,-3.2);tLights[1].position.set(-2.5,2.6,3.2);tLights[2].position.set(-3.5,5,0.4);tLights.forEach(l=>scene.add(l));
 const tM={phase:'play',ball:{owner:null}};
-const tP={B:{id:'B',x:-0.15,z:-0.64,vx:0,vz:0,face:0.18,jump:0.22,dribble:0,action:{type:'clash',t:0,dur:1,rec:1}},
-          F:{id:'F',x:0.15,z:0.64,vx:0,vz:0,face:Math.PI+0.18,jump:0.12,dribble:0,action:{type:'clash',t:0,dur:1,rec:1}}};
-const tBall={x:0,y:2.9,z:0,vx:0.15,vz:0.5,vy:0,owner:null,mode:'basket'};
+const tP={B:{id:'B',x:-0.15,z:-0.64,vx:0,vz:0,face:0.18,jump:0.3,dribble:0,action:{type:'clash',t:0,dur:1,rec:1}},
+          F:{id:'F',x:0.15,z:0.64,vx:0,vz:0,face:Math.PI+0.18,jump:0.46,dribble:0,action:{type:'clash',t:0,dur:1,rec:1}}};
+const tBall={x:0,y:2.62,z:0,vx:0.15,vz:0.5,vy:0,owner:null,mode:'basket'};
 function titleShot(dt){
   // key art: the two of them at the midline, wood behind one and grass behind the other, the ball between their hands
   syncChar(tM,chars.B,tP.B,dt,time);syncChar(tM,chars.F,tP.F,dt,time);
-  tBall.y=2.95+Math.sin(time*1.7)*0.06;tM.ball=tBall;syncBall(tM,dt);tM.ball={owner:null};
+  tBall.y=2.64+Math.sin(time*1.7)*0.05;
+  for(const id of ['B','F']){const ch=chars[id],sd=id==='B'?-1:1;ch.root.updateMatrixWorld(true);reach(ch,ch.aR,tBall.x,tBall.y-BALL_DROP-0.12,tBall.z+sd*0.13,1);}
+  tM.ball=tBall;syncBall(tM,dt);tM.ball={owner:null};
   titleMorph+=dt;if(titleMorph>2.6){titleMorph=0;tBall.mode=tBall.mode==='basket'?'foot':'basket';startMorph(tBall.mode);}
   titleDust+=dt;if(titleDust>0.9){titleDust=0;burst({x:0.15,y:0.05,z:0.75},[0x35c274,0x2a8a4c],5,1.6,0.6,5);burst({x:-0.15,y:0.05,z:-0.75},[0xc98b4e,0xe8b27a],4,1.4,0.5,5);}
   const d=Math.sin(time*0.11);
-  camera.position.set(-5.2+d*0.15,0.9,0.9+d*0.3);camLook.set(0,1.75,-1.1+d*0.2);camera.lookAt(camLook);camPos.copy(camera.position);
+  camera.position.set(-4.6+d*0.15,0.85,0.8+d*0.3);camLook.set(0,1.62,-1.0+d*0.2);camera.lookAt(camLook);camPos.copy(camera.position);
   meRing.visible=beacon.visible=lane.visible=spot.visible=false;
 }
 let netKick=0,netWho='B',lastDrib=0,lastStride=0;
